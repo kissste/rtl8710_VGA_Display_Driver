@@ -14,7 +14,7 @@ ATVG - Will start the VGA Display<br>
 **Pictures:**<br>
 https://goo.gl/photos/ztxVsQsS6xFEcsJM6
 
-**Wiring:**
+**Wiring:**<br>
 GPIO_A1 - VGA:Video via a resistor<br>
 GPIO_C2 - VGA:H-Synch directly<br>
 GPIO_A5 - VGA:V-Sync directly<br>
