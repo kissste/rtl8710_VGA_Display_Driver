@@ -72,7 +72,7 @@ gpio_t gpio_ledC3;
 gpio_t gpio_ledC4;
 gpio_t gpio_ledC5;
 
-#define SSI_ROWS_BLOCK	12 //submit 12 rows in one DMA
+#define SSI_ROWS_BLOCK	100 //submit 12 rows in one DMA
 #define SSI_LINE_A  132 //132 bytes = 1056 bits
 #define SSI_ROWS_A  600 //600 rows
 #define SSI_MAX_LEN_A  SSI_LINE_A*SSI_ROWS_A //*600 //132 bytes = 1056 bits
@@ -180,19 +180,19 @@ void volatile master_tr_done_callbackA(void *pdata, SpiIrq event)
 		//uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 		portDISABLE_INTERRUPTS();
 		lineV++;
-		if (lineV == 78) { 
+		if (lineV == SSI_ROWS_A/SSI_ROWS_BLOCK + 28) { 
 			lineV = 0;
 		}
-		if (lineV < 50) { // Video and H-Sync
+		if (lineV < SSI_ROWS_A/SSI_ROWS_BLOCK) { // Video and H-Sync
 			spi_master_write_stream_dma2(&spi_masterA, dma_bufferA+lineV*SSI_LINE_A*SSI_ROWS_BLOCK, SSI_LINE_A*SSI_ROWS_BLOCK); // Video
 			spi_master_write_stream_dma2(&spi_masterC, dma_bufferC, SSI_LINE_C*SSI_ROWS_BLOCK); // H-Sync
 		} else {
 			spi_master_write_stream_dma2(&spi_masterA, dma_bufferA_blank, SSI_LINE_A); // Video Blank
 			spi_master_write_stream_dma2(&spi_masterC, dma_bufferC, SSI_LINE_C); // H-Sync
-			if(lineV == 51) { // V-Sync On
+			if(lineV == SSI_ROWS_A/SSI_ROWS_BLOCK + 1) { // V-Sync On
 				//__delay_xyz(5);
 				GPIO_A5 = 1;
-			} else if(lineV == 55) { // V-Sync Off
+			} else if(lineV == SSI_ROWS_A/SSI_ROWS_BLOCK + 5) { // V-Sync Off
 				//__delay_xyz(5);
 				GPIO_A5 = 0;
 			}
@@ -371,15 +371,15 @@ void fATVG(void *arg) {
     CfgSysDebugInfo = -1;
     CfgSysDebugWarn = -1;
 #endif
-	printf("ATHS started\n");
-	fATST(NULL);
+	printf("AVG started\n");
+	//fATST(NULL);
 	
     if(SSI_init() != 0){
         printf("[%s] SSI_init() failed\n", __func__);
         goto err_out;
     }
 
-	printf("ATHS SSI_init done\n");
+	printf("ATVG SSI_init done\n");
 	
 	vTaskDelay(1000);
 	
@@ -447,23 +447,28 @@ void fATVG(void *arg) {
 	
 	u16 posx = 36;
 	u16 posy = 36;
-	const char TestText1[200] = "!'#$%&()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOP";
+	const char TestText1[200] = "Bobo is the best!!!";
 	TDFPutStr(posx, posy, &TestText1, 0, 1);
 	posy += 26;
-	const char TestText2[200] = "QRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+	const char TestText2[200] = "Pup is the better than Bobo, said Pup.";
 	TDFPutStr(posx, posy, &TestText2, 0, 1);
 	posy += 26;
-	const char TestText3[200] = "abcdefghijklmnopqrstuvwxyz";
+	const char TestText3[200] = "Bobo is better than Pup no matter what!";
 	TDFPutStr(posx, posy, &TestText3, 0, 1);
 	posy += 26;
-	const char TestText4[200] = "[ ][][  ]";
+	const char TestText4[200] = "Pup cancels out Bobo";
 	TDFPutStr(posx, posy, &TestText4, 0, 1);	
 	posy += 26;
+	const char TestText5[200] = "Miss Bobo says that Pup can't post messages";
+	TDFPutStr(posx, posy, &TestText5, 0, 1);	
+	posy += 26;	
 	
 err_out:
-    while(1){
-        vTaskDelay(1000);
-    }
+    //while(1) {
+    //    vTaskDelay(1000);
+    //}
+	printf("ATVG finished\n");
+	vTaskDelay(500);
 }
 
 /******************************************************************************/
@@ -698,6 +703,8 @@ void fATWD(void *arg){
 		vTaskDelay(1 * configTICK_RATE_HZ);
 		timeout --;
 	}
+    dhcps_deinit();
+    wifi_off();	
     printf("\n\r");
 exit:
     init_wifi_struct( );
