@@ -55,7 +55,7 @@ void connect_close(void) {
 
 void connect_start(void) {
 	DBG_8195A("connect_start\n");
-	connect_close();
+	//connect_close();
 }
 
 
