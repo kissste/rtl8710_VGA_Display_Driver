@@ -32,5 +32,9 @@
 *.dSYM/
 *.su
 *.d
-*.map
 *.asm
+*.map
+*.nmap
+*.acf
+*.bin
+
