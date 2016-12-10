@@ -8,6 +8,10 @@ One GPIO for V-Sync
 
 https://goo.gl/photos/ztxVsQsS6xFEcsJM6
 
+Wiring:
+
 GPIO_A1 - Video
+
 GPIO_C2 - H-Synch
+
 GPIO_A5 - V-Sync
