@@ -1,7 +1,7 @@
 # rtl8710_VGA_Display_Driver
 VGA Driver for RTL8710, RTL8711 and RTL8195 SoC
 
-Runs resolution SVGA 800x600 ~@63Hz at (Pixel frequency 41.333MHz)
+Runs resolution SVGA 800x600 ~@63Hz at (Pixel frequency 41.333MHz)<br>
 Alternatively, resolution VESA 640x480 ~@97Hz (at Pixel frequency 41.333MHz)
 
 Using 2 SPIs channels - one for video signal, second one for H-Sync<br>
@@ -19,7 +19,7 @@ https://goo.gl/photos/ztxVsQsS6xFEcsJM6
 GPIO_A1 - VGA:Video via a resistor<br>
 GPIO_C2 - VGA:H-Synch directly<br>
 GPIO_A5 - VGA:V-Sync directly<br>
-![alt text](cod/wiring.jpg "Wiring Diagram")
+![alt text](doc/wiring.jpg "Wiring Diagram")
 
 **SVGA 800x600 @60Hz Timing:***<br>
 http://tinyvga.com/vga-timing/800x600@60Hz
