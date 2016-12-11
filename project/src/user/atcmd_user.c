@@ -39,9 +39,6 @@ mp3_server_setings mp3_serv = {0,{0}}; //{ PLAY_PORT, { PLAY_SERVER }};
   
 #define CPU_CLOCK_SEL_VALUE 0
 
-#define SCLK_FREQ_A 		200000000*5/6/4 // 41.66MHz CPU@166.66MHz @SPI1 ssi_idx=1 A-port
-#define SCLK_FREQ_C 		200000000*5/6/4/4 // 325.521kHz CPU@166.66MHz @SPI1 ssi_idx=1 C-port
-
 // SPI0 (S0)
 #define SPI0C_MOSI	PC_2
 #define SPI0C_MISO	PC_3
@@ -72,12 +69,42 @@ gpio_t gpio_ledC3;
 gpio_t gpio_ledC4;
 gpio_t gpio_ledC5;
 
+#define resolution 0 //800x600
+
+#if resolution == 0 //SVGA Resolution 800x600@60Hz
+//http://tinyvga.com/vga-timing/800x600@60Hz
 #define SSI_ROWS_BLOCK	100 //submit 12 rows in one DMA
-#define SSI_LINE_A  132 //132 bytes = 1056 bits
-#define SSI_ROWS_A  600 //600 rows
-#define SSI_MAX_LEN_A  SSI_LINE_A*SSI_ROWS_A //*600 //132 bytes = 1056 bits
-#define SSI_LINE_C  SSI_LINE_A/4 //132/4 = 33 bytes
-#define SSI_MAX_LEN_C  SSI_LINE_C*SSI_ROWS_BLOCK //132/4 = 33 bytes = 1056/4 bits
+#define SSI_VIDEO_A 	800 //800 columns (bits)
+#define SSI_VIDEO_A_BYTES 	SSI_VIDEO_A/8 //800/8 bytes = 100 bytes
+#define SSI_VIDEO_BLANK 256 //256 blanking columns(bits)
+#define SSI_VIDEO_BLANK_BYTES SSI_VIDEO_BLANK/8 //256/8 = 32 bytes
+#define SSI_LINE_A  	SSI_VIDEO_A/8 + SSI_VIDEO_BLANK/8 //800/8 + 32 blanking bytes = 132 bytes = 1056 bits
+#define SSI_ROWS_A  	600 //600 rows
+#define SSI_MAX_LEN_A  	SSI_LINE_A*SSI_ROWS_A //*600 //132 bytes = 1056 bits
+#define SSI_FREQ_C_DIV	4
+#define SSI_LINE_C  	SSI_LINE_A/SSI_FREQ_C_DIV //132/4 = 33 bytes
+#define SSI_MAX_LEN_C  	SSI_LINE_C*SSI_ROWS_BLOCK //132/4 = 33 bytes = 1056/4 bits
+#define SSI_HSYNC_SHIFT	14*8 //delayed HSYNC in SSI C Line bits
+#endif
+
+#if resolution == 1 //VGA Resolution 640x480@100Hz
+//http://tinyvga.com/vga-timing/640x480@100Hz
+#define SSI_ROWS_BLOCK	100 //submit 12 rows in one DMA
+#define SSI_VIDEO_A 	640 //640 columns (bits)
+#define SSI_VIDEO_A_BYTES 	SSI_VIDEO_A/8 //640/8 bytes = 80 bytes
+#define SSI_VIDEO_BLANK	208 //208 blanking columns(bits)
+#define SSI_VIDEO_BLANK_BYTES SSI_VIDEO_BLANK/8 //208/8 = 26 bytes
+#define SSI_LINE_A  	SSI_VIDEO_A/8 + SSI_VIDEO_BLANK/8 //640/8 + 26 bytes = 106 bytes = 848 bits
+#define SSI_ROWS_A  	480 //480 rows
+#define SSI_MAX_LEN_A  	SSI_LINE_A*SSI_ROWS_A //*480 //106 bytes = 848 bits
+#define SSI_FREQ_C_DIV	2
+#define SSI_LINE_C  	SSI_LINE_A/SSI_FREQ_C_DIV //106/2 = 53 bytes
+#define SSI_MAX_LEN_C  	SSI_LINE_C*SSI_ROWS_BLOCK //106/2 = 53 bytes = 848/2 bits
+#define SSI_HSYNC_SHIFT	14*8 //delayed HSYNC in SSI C Line bits
+#endif
+
+#define SCLK_FREQ_A 		200000000*5/6/4 // 41.66MHz CPU@166.66MHz @SPI1 ssi_idx=1 A-port
+#define SCLK_FREQ_C 		200000000*5/6/4/SSI_FREQ_C_DIV // 325.521kHz CPU@166.66MHz @SPI1 ssi_idx=1 C-port
 
 // Spi Masters
 spi_t spi_masterA;
@@ -98,16 +125,18 @@ void spi_master_write_stream_dma2(spi_t *obj, char *tx_buffer, uint32_t length)
 	
 	pHalSsiAdaptor = &obj->spi_adp;
 	pHalSsiOp = &obj->spi_op;
+
+#if 0 //**** This was too slow to be execute every single time DMA is submitted, removed and put into spi_master_init_dma2 to be called separately***
+	u32 abc = HalSsiGetTxFifoLevelRtl8195a(pHalSsiAdaptor);
+	DBG_SSI_ERR("%d\n",abc);
 	
-	//u32 abc = HalSsiGetTxFifoLevelRtl8195a(pHalSsiAdaptor);
-	//DBG_SSI_ERR("%d\n",abc);
-	
-    //if ((obj->dma_en & SPI_DMA_TX_EN)==0) {
-    //    if (HAL_OK == HalSsiTxGdmaInit(pHalSsiOp, pHalSsiAdaptor)) {
-    //        obj->dma_en |= SPI_DMA_TX_EN;
-    //    }
-    //}
-    
+    if ((obj->dma_en & SPI_DMA_TX_EN)==0) {
+        if (HAL_OK == HalSsiTxGdmaInit(pHalSsiOp, pHalSsiAdaptor)) {
+            obj->dma_en |= SPI_DMA_TX_EN;
+        }
+    }
+#endif
+ 
     obj->state |= SPI_STATE_TX_BUSY;	
     HalSsiDmaSend(pHalSsiAdaptor, (u8 *) tx_buffer, length);
 }
@@ -210,16 +239,15 @@ void populate_bufferA_blank()
 void populate_bufferA() 
 {
 	for(u32 i=0; i<SSI_ROWS_A; i++) {
-		u8 m = i%8;
 		memset(dma_bufferA+i*SSI_LINE_A, 0xFF, SSI_LINE_A);	//bytes
-		memset(dma_bufferA+i*SSI_LINE_A+100, 0x00, 32);
+		memset(dma_bufferA+i*SSI_LINE_A+SSI_VIDEO_A_BYTES, 0x00, SSI_VIDEO_BLANK_BYTES);
 	}
 }
 
 
 void populate_bufferC() 
 {
-	u32 n = 14;
+	u32 n = SSI_HSYNC_SHIFT/8;
 	for(u32 i=0; i<SSI_ROWS_BLOCK; i++) {
 		memset(dma_bufferC+i*SSI_LINE_C, 0x0, SSI_LINE_C);
 		//4x FF
@@ -285,11 +313,6 @@ int SSI_init(void)
 		result = -1;
 		goto err_out;
 	}
-	
-	//printf("&dma_bufferA: 0x%X\n", &dma_bufferA);
-	//printf("dma_bufferA: 0x%X\n", dma_bufferA);
-	//printf("DMA Buffer A completed\n");
-	//fATST(NULL);
 
 	// A_Blank
 	dma_bufferA_blank = malloc(SSI_LINE_A);
@@ -300,11 +323,6 @@ int SSI_init(void)
 		result = -1;
 		goto err_out;
 	}
-
-	//printf("&dma_buffA_blank: 0x%X\n", &dma_bufferA_blank);
-	//printf("dma_buffA_blank: 0x%X\n", dma_bufferA_blank);
-	//printf("DMA Buffer A Blank completed\n");
-	//fATST(NULL);
 	
 	// C Buffer
 	dma_bufferC = malloc(SSI_LINE_C);
@@ -316,11 +334,7 @@ int SSI_init(void)
 		goto err_out;
 	}
 	
-	//printf("&dma_bufferC: 0x%X\n", &dma_bufferC);
-	//printf("dma_bufferC: 0x%X\n", dma_bufferC);
-	//printf("DMA Buffer C completed\n");
-	//fATST(NULL);
-		
+	//Don't want to create any gap between these 2 DMA channels (Video and HSYNC)
 	taskENTER_CRITICAL();
 	spi_master_write_stream_dma2(&spi_masterA, dma_bufferA, SSI_LINE_A*SSI_ROWS_BLOCK); //buff_len in bytes
 	spi_master_write_stream_dma2(&spi_masterC, dma_bufferC, SSI_LINE_C*SSI_ROWS_BLOCK); //buff_len in bytes
