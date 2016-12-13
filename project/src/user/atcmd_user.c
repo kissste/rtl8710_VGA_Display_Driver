@@ -55,51 +55,35 @@ mp3_server_setings mp3_serv = {0,{0}}; //{ PLAY_PORT, { PLAY_SERVER }};
 extern const u8 GPIO_SWPORT_DR_TBL[];
 extern const u8 GPIO_SWPORT_DDR_TBL[];
 
-gpio_t gpio_ledA0;
-gpio_t gpio_ledA1;
-gpio_t gpio_ledA2;
-gpio_t gpio_ledA3;
-gpio_t gpio_ledA4;
-gpio_t gpio_ledA5;
+gpio_t gpio_ledA5; //VSynch
 
-gpio_t gpio_ledC0;
-gpio_t gpio_ledC1;
-gpio_t gpio_ledC2;
-gpio_t gpio_ledC3;
-gpio_t gpio_ledC4;
-gpio_t gpio_ledC5;
-
-#define resolution 0 //800x600
-
-#if resolution == 0 //SVGA Resolution 800x600@60Hz
+//SVGA Resolution 800x600@63Hz
 //http://tinyvga.com/vga-timing/800x600@60Hz
 #define SSI_ROWS_BLOCK	100 //submit 12 rows in one DMA
 #define SSI_VIDEO_A 	800 //800 columns (bits)
-#define SSI_VIDEO_A_BYTES 	SSI_VIDEO_A/8 //800/8 bytes = 100 bytes
+#define SSI_VIDEO_A_BYTES	100	//SSI_VIDEO_A/8 //800/8 bytes = 100 bytes
 #define SSI_VIDEO_BLANK 256 //256 blanking columns(bits)
-#define SSI_VIDEO_BLANK_BYTES SSI_VIDEO_BLANK/8 //256/8 = 32 bytes
-#define SSI_LINE_A  	SSI_VIDEO_A/8 + SSI_VIDEO_BLANK/8 //800/8 + 32 blanking bytes = 132 bytes = 1056 bits
+#define SSI_VIDEO_BLANK_BYTES	32 //SSI_VIDEO_BLANK/8 //256/8 = 32 bytes
+#define SSI_LINE_A  	132 //800/8 + 32 blanking bytes = 132 bytes = 1056 bits
 #define SSI_ROWS_A  	600 //600 rows
-#define SSI_MAX_LEN_A  	SSI_LINE_A*SSI_ROWS_A //*600 //132 bytes = 1056 bits
+#define SSI_MAX_LEN_A  	SSI_LINE_A*SSI_ROWS_A //The full screen, including H Blanking
 #define SSI_FREQ_C_DIV	4
 #define SSI_LINE_C  	SSI_LINE_A/SSI_FREQ_C_DIV //132/4 = 33 bytes
-#define SSI_MAX_LEN_C  	SSI_LINE_C*SSI_ROWS_BLOCK //132/4 = 33 bytes = 1056/4 bits
 #define SSI_HSYNC_SHIFT	14*8 //delayed HSYNC in SSI C Line bits
-#endif
 
-#if resolution == 1 //VGA Resolution 640x480@100Hz
+#if 0
+//SVGA Resolution 640x480@97Hz - not tested
 //http://tinyvga.com/vga-timing/640x480@100Hz
 #define SSI_ROWS_BLOCK	100 //submit 12 rows in one DMA
 #define SSI_VIDEO_A 	640 //640 columns (bits)
-#define SSI_VIDEO_A_BYTES 	SSI_VIDEO_A/8 //640/8 bytes = 80 bytes
+#define SSI_VIDEO_A_BYTES	80 //SSI_VIDEO_A/8 //640/8 bytes = 80 bytes
 #define SSI_VIDEO_BLANK	208 //208 blanking columns(bits)
-#define SSI_VIDEO_BLANK_BYTES SSI_VIDEO_BLANK/8 //208/8 = 26 bytes
-#define SSI_LINE_A  	SSI_VIDEO_A/8 + SSI_VIDEO_BLANK/8 //640/8 + 26 bytes = 106 bytes = 848 bits
+#define SSI_VIDEO_BLANK_BYTES	26 //SSI_VIDEO_BLANK/8 //208/8 = 26 bytes
+#define SSI_LINE_A  	96 //SSI_VIDEO_A_BYTES + SSI_VIDEO_BLANK_BYTES //640/8 + 26 bytes = 106 bytes = 848 bits
 #define SSI_ROWS_A  	480 //480 rows
 #define SSI_MAX_LEN_A  	SSI_LINE_A*SSI_ROWS_A //*480 //106 bytes = 848 bits
 #define SSI_FREQ_C_DIV	2
 #define SSI_LINE_C  	SSI_LINE_A/SSI_FREQ_C_DIV //106/2 = 53 bytes
-#define SSI_MAX_LEN_C  	SSI_LINE_C*SSI_ROWS_BLOCK //106/2 = 53 bytes = 848/2 bits
 #define SSI_HSYNC_SHIFT	14*8 //delayed HSYNC in SSI C Line bits
 #endif
 
@@ -282,11 +266,7 @@ int SSI_init(void)
     gpio_init(&gpio_ledA5, PA_5);
     gpio_dir(&gpio_ledA5, PIN_OUTPUT);    // Direction: Output
     gpio_mode(&gpio_ledA5, PullNone);     // PullNone
-	
-    gpio_init(&gpio_ledC4, PC_4);
-    gpio_dir(&gpio_ledC4, PIN_OUTPUT);    // Direction: Output
-    gpio_mode(&gpio_ledC4, PullNone);     // PullNone
-	
+		
 	// A SPI
 	spi_init(&spi_masterA, SPI1A_MOSI, SPI1A_MISO, SPI1A_SCLK, SPI1A_CS);
     spi_format(&spi_masterA, 32, 3, 0); //32 bits, mode 3, master
@@ -325,7 +305,7 @@ int SSI_init(void)
 	}
 	
 	// C Buffer
-	dma_bufferC = malloc(SSI_LINE_C);
+	dma_bufferC = malloc(SSI_LINE_C*SSI_ROWS_BLOCK);
     if (dma_bufferC != NULL) {	
 		populate_bufferC();
 	} else {
@@ -385,7 +365,7 @@ void fATVG(void *arg) {
     CfgSysDebugInfo = -1;
     CfgSysDebugWarn = -1;
 #endif
-	printf("AVG started\n");
+	printf("ATVG started v0.01\n");
 	//fATST(NULL);
 	
     if(SSI_init() != 0){
